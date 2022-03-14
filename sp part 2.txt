@@ -1,0 +1,73 @@
+USE [QLVT_DATHANG]
+GO
+/****** Object:  StoredProcedure [dbo].[SP_CHECKTT_MAVT]    Script Date: 12/18/2021 9:27:06 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROC [dbo].[SP_CHECKTT_MAVT]
+@MAVT nchar(4)
+AS
+BEGIN
+	IF EXISTS(SELECT 1 
+			  FROM (SELECT MAVT FROM Vattu) VT  
+			  WHERE VT.MAVT = @MAVT  AND (EXISTS(SELECT 1 FROM CTPN WHERE CTPN.MAVT = VT.MAVT) OR EXISTS(SELECT 1 FROM CTPX WHERE CTPX.MAVT = VT.MAVT) 
+					OR EXISTS(SELECT 1 FROM CTDDH WHERE CTDDH.MAVT = VT.MAVT)))
+			RETURN 1; -- Mã Vattu đang dùng ở phân mảnh hiện tại
+	ELSE IF EXISTS(SELECT 1
+				   FROM (SELECT MAVT FROM Vattu) VT  
+				   WHERE VT.MAVT = @MAVT AND (EXISTS(SELECT 1 FROM LINK1.QLVT_DATHANG.dbo.CTPN PN WHERE PN.MAVT = VT.MAVT) OR EXISTS(SELECT MAPX FROM LINK1.QLVT_DATHANG.dbo.CTPX PX WHERE PX.MAVT = VT.MAVT) 
+						OR EXISTS(SELECT MasoDDH FROM LINK1.QLVT_DATHANG.dbo.CTDDH DH WHERE DH.MAVT = VT.MAVT)))
+			RETURN 2; -- Mã Vattu đang dùng ở phân mảnh khác
+	RETURN 0; -- Không dùng
+END
+
+//ttk
+USE [QLVT_DATHANG]
+GO
+/****** Object:  StoredProcedure [dbo].[sp_TaoTaiKhoan]    Script Date: 12/18/2021 9:27:19 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROC [dbo].[sp_TaoTaiKhoan]
+	@LGNAME VARCHAR(50),
+	@PASS VARCHAR(50),
+	@USERNAME VARCHAR(50),
+	@ROLE VARCHAR(50)
+AS
+BEGIN
+  DECLARE @RET INT
+  EXEC @RET= SP_ADDLOGIN @LGNAME, @PASS,'QLVT_DATHANG'                     
+
+  IF (@RET =1)  -- LOGIN NAME BI TRUNG
+     RETURN 1
+
+  EXEC @RET= SP_GRANTDBACCESS @LGNAME, @USERNAME
+  IF (@RET =1)  -- USER  NAME BI TRUNG
+  BEGIN
+       EXEC SP_DROPLOGIN @LGNAME
+       RETURN 2
+  END
+  EXEC sp_addrolemember @ROLE, @USERNAME
+
+  IF @ROLE= 'CONGTY' 
+	BEGIN
+		EXEC sp_addsrvrolemember @LGNAME, 'sysadmin'
+		EXEC sp_addsrvrolemember @LGNAME, 'SecurityAdmin'
+		EXEC sp_addsrvrolemember @LGNAME, 'ProcessAdmin'
+	END
+
+  IF @ROLE= 'CHINHANH'
+	BEGIN 
+		EXEC sp_addsrvrolemember @LGNAME, 'sysadmin'
+		EXEC sp_addsrvrolemember @LGNAME, 'SecurityAdmin'
+		EXEC sp_addsrvrolemember @LGNAME, 'ProcessAdmin'
+	END
+  IF @ROLE= 'USER'
+	BEGIN  
+		EXEC sp_addsrvrolemember @LGNAME, 'ProcessAdmin'
+	END
+
+END
